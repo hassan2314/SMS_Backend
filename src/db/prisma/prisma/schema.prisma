@@ -1,0 +1,184 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(uuid())
+  name         String
+  email        String   @unique
+  dob          DateTime
+  password     String
+  refreshToken String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  role         Role
+
+  student Student?
+  teacher Teacher?
+
+  @@index([role])
+}
+
+model Student {
+  id      String  @id @default(uuid())
+  userId  String  @unique
+  classId String?
+
+  attendance           Attendance[]
+  MonthlyResult        MonthlyResult[]
+  AssignmentSubmission AssignmentSubmission[]
+
+  user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  class Class? @relation(fields: [classId], references: [id])
+}
+
+model Teacher {
+  id     String @id @default(uuid())
+  userId String @unique
+
+  user         User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subjects     Subject[]
+  dropRequests SubjectDropRequest[]
+  Timetable    Timetable[]
+  Assignment   Assignment[]
+}
+
+model Class {
+  id         String       @id @default(uuid())
+  name       String
+  students   Student[]
+  subjects   Subject[]
+  Timetable  Timetable[]
+  Assignment Assignment[]
+}
+
+model Subject {
+  id        String @id @default(uuid())
+  name      String
+  classId   String
+  teacherId String
+
+  class         Class                @relation(fields: [classId], references: [id])
+  teacher       Teacher              @relation(fields: [teacherId], references: [id])
+  dropRequests  SubjectDropRequest[]
+  Timetable     Timetable[]
+  attendance    Attendance[]
+  Assignment    Assignment[]
+  MonthlyResult MonthlyResult[]
+}
+
+model SubjectDropRequest {
+  id        String     @id @default(uuid())
+  subjectId String
+  teacherId String
+  reason    String?
+  status    DropStatus @default(PENDING)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  subject Subject @relation(fields: [subjectId], references: [id])
+  teacher Teacher @relation(fields: [teacherId], references: [id])
+}
+
+enum Role {
+  ADMIN
+  TEACHER
+  STUDENT
+}
+
+enum DropStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model Attendance {
+  id        String           @id @default(uuid())
+  studentId String
+  subjectId String
+  date      DateTime
+  status    AttendanceStatus
+
+  student Student @relation(fields: [studentId], references: [id])
+  subject Subject @relation(fields: [subjectId], references: [id])
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  LEAVE
+}
+
+model Timetable {
+  id        String  @id @default(uuid())
+  day       Weekday
+  startTime String
+  endTime   String
+  subjectId String
+  classId   String
+  teacherId String
+
+  subject Subject @relation(fields: [subjectId], references: [id])
+  class   Class   @relation(fields: [classId], references: [id])
+  teacher Teacher @relation(fields: [teacherId], references: [id])
+}
+
+enum Weekday {
+  Monday
+  Tuesday
+  Wednesday
+  Thursday
+  Friday
+  Saturday
+}
+
+model Assignment {
+  id          String   @id @default(uuid())
+  title       String
+  description String?
+  dueDate     DateTime
+  subjectId   String
+  classId     String
+  teacherId   String
+  createdAt   DateTime @default(now())
+
+  subject              Subject                @relation(fields: [subjectId], references: [id])
+  class                Class                  @relation(fields: [classId], references: [id])
+  teacher              Teacher                @relation(fields: [teacherId], references: [id])
+  AssignmentSubmission AssignmentSubmission[]
+}
+
+model AssignmentSubmission {
+  id           String    @id @default(uuid())
+  assignmentId String
+  studentId    String
+  submittedAt  DateTime? // null = not submitted yet
+  fileUrl      String? // optional link to submitted file
+  remarks      String? // optional feedback from teacher
+  grade        Float? // optional grading
+
+  assignment Assignment @relation(fields: [assignmentId], references: [id])
+  student    Student    @relation(fields: [studentId], references: [id])
+
+  @@unique([assignmentId, studentId]) // prevent duplicate submissions
+}
+
+model MonthlyResult {
+  id         String   @id @default(uuid())
+  studentId  String
+  subjectId  String
+  month      String // e.g., "January", "February", or format "2025-07"
+  marks      Int
+  totalMarks Int      @default(25)
+  remarks    String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  student Student @relation(fields: [studentId], references: [id])
+  subject Subject @relation(fields: [subjectId], references: [id])
+}
