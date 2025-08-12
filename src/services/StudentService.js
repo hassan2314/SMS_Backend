@@ -33,6 +33,7 @@ export class StudentService {
         user: {
           select: {
             name: true,
+            email: true,
           },
         },
       },

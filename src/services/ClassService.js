@@ -13,6 +13,7 @@ export class ClassService {
             user: {
               select: {
                 name: true,
+                email: true, // will return if exists in DB
               },
             },
           },
