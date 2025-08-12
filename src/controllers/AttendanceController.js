@@ -86,9 +86,23 @@ export class AttendanceController {
   getAttendancePercentageOfUser = async (req, res) => {
     try {
       const studentId = req.params.id;
+      console.log(studentId);
       const data = await this.attendanceService.getAttendancePercentageByUser(
         studentId
       );
+      console.log(data);
+      res.status(200).json(new ApiResponse(200, data));
+    } catch (error) {
+      console.log(error);
+      res.status(500).json(new ApiError(500, error.message));
+    }
+  };
+
+  getAttendancePercentageByStudent = async (req, res) => {
+    try {
+      const userId = req.params.id;
+      const data =
+        await this.attendanceService.getAttendancePercentageByStudent(userId);
       res.status(200).json(new ApiResponse(200, data));
     } catch (error) {
       res.status(500).json(new ApiError(500, error.message));

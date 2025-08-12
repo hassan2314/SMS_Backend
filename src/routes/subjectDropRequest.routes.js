@@ -8,18 +8,38 @@ import { SubjectDropRequestController } from "../controllers/SubjectDropRequestC
 
 const router = Router();
 const service = new SubjectDropRequestService();
-const controller = new SubjectDropRequestController(service);
+const subjectDropRequestController = new SubjectDropRequestController(service);
 
-router.post("/", verifyJwt, adminOrTecherOnly, controller.createRequest);
+router.post(
+  "/",
+  verifyJwt,
+  adminOrTecherOnly,
+  subjectDropRequestController.createRequest
+);
 router.get(
   "/my",
   verifyJwt,
   adminOrTecherOnly,
-  controller.getRequestsByTeacher
+  subjectDropRequestController.getRequestsByTeacher
 );
 
-router.get("/", verifyJwt, adminOnly, controller.getAllRequests);
-router.get("/:id", verifyJwt, adminOnly, controller.getRequestById);
-router.put("/:id", verifyJwt, adminOnly, controller.updateRequestStatus);
+router.get(
+  "/",
+  verifyJwt,
+  adminOnly,
+  subjectDropRequestController.getAllRequests
+);
+router.get(
+  "/:id",
+  verifyJwt,
+  adminOnly,
+  subjectDropRequestController.getRequestById
+);
+router.put(
+  "/:id",
+  verifyJwt,
+  adminOnly,
+  subjectDropRequestController.updateRequestStatus
+);
 
 export default router;

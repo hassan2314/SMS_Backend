@@ -7,15 +7,51 @@ export class AttendanceService {
     });
   }
 
-  async getAttendanceByStudent(studentId) {
+  async getAttendanceByStudent(Id) {
+    let studentId = await prisma.student.findUnique({
+      where: { userId: Id },
+      select: { id: true },
+    });
+    studentId = studentId.id;
     return await prisma.attendance.findMany({
       where: { studentId },
       include: {
         subject: { select: { name: true } },
-        class: { select: { name: true } },
       },
       orderBy: { date: "desc" },
     });
+  }
+
+  async getAttendancePercentageByStudent(userId) {
+    // Step 1: Get the student's ID from userId
+    const student = await prisma.student.findUnique({
+      where: { userId },
+      select: { id: true },
+    });
+
+    if (!student) {
+      throw new Error("Student not found");
+    }
+
+    const studentId = student.id;
+
+    // Step 2: Count total and present attendance
+    const [total, present] = await Promise.all([
+      prisma.attendance.count({
+        where: { studentId },
+      }),
+      prisma.attendance.count({
+        where: {
+          studentId,
+          status: "PRESENT",
+        },
+      }),
+    ]);
+
+    // Step 3: Calculate percentage
+    const percentage = total === 0 ? 0 : Math.round((present / total) * 100);
+
+    return { percentage, present, total };
   }
 
   async getAttendanceByClass(classId, date) {
@@ -133,6 +169,7 @@ export class AttendanceService {
         percentage: Math.round(percentage),
       });
     }
+    console.log(result);
 
     return result;
   }
