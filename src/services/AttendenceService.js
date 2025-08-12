@@ -25,9 +25,11 @@ export class AttendanceService {
   async getAttendancePercentageByStudent(userId) {
     // Step 1: Get the student's ID from userId
     const student = await prisma.student.findUnique({
-      where: { userId },
+      where: { id: userId },
       select: { id: true },
     });
+    console.log("From Service  1 ", userId);
+    console.log("From Service ", student.id);
 
     if (!student) {
       throw new Error("Student not found");

@@ -101,6 +101,7 @@ export class AttendanceController {
   getAttendancePercentageByStudent = async (req, res) => {
     try {
       const userId = req.params.id;
+      console.log(userId);
       const data =
         await this.attendanceService.getAttendancePercentageByStudent(userId);
       res.status(200).json(new ApiResponse(200, data));
