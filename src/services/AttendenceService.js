@@ -75,8 +75,65 @@ export class AttendanceService {
     });
   }
 
-  async getAttendancePercentageBySubject() {
-    const subjects = await prisma.subject.findMany({
+  // async getAttendancePercentageBySubject() {
+  //   const subjects = await prisma.subject.findMany({
+  //     include: {
+  //       class: {
+  //         include: {
+  //           students: {
+  //             include: {
+  //               user: true,
+  //             },
+  //           },
+  //         },
+  //       },
+  //       attendance: true,
+  //     },
+  //   });
+
+  //   const result = [];
+
+  //   for (const subject of subjects) {
+  //     const studentStats = [];
+
+  //     for (const student of subject.class.students) {
+  //       const attendanceRecords = await prisma.attendance.findMany({
+  //         where: {
+  //           subjectId: subject.id,
+  //           studentId: student.id,
+  //         },
+  //       });
+
+  //       const presentCount = attendanceRecords.filter(
+  //         (a) => a.status === "PRESENT"
+  //       ).length;
+
+  //       const totalCount = attendanceRecords.length;
+  //       const percentage =
+  //         totalCount > 0 ? (presentCount / totalCount) * 100 : 0;
+
+  //       studentStats.push({
+  //         studentId: student.id,
+  //         studentName: student.user.name,
+  //         present: presentCount,
+  //         total: totalCount,
+  //         percentage: Math.round(percentage),
+  //       });
+  //     }
+
+  //     result.push({
+  //       subjectId: subject.id,
+  //       subjectName: subject.name,
+  //       students: studentStats,
+  //     });
+  //   }
+
+  //   return result;
+  // }
+  async getAttendancePercentageBySubject(subjectId) {
+    // Get the subject with its class and students
+    const subject = await prisma.subject.findUnique({
+      where: { id: subjectId },
       include: {
         class: {
           include: {
@@ -87,48 +144,45 @@ export class AttendanceService {
             },
           },
         },
-        attendance: true,
       },
     });
 
-    const result = [];
+    if (!subject) {
+      throw new Error("Subject not found");
+    }
 
-    for (const subject of subjects) {
-      const studentStats = [];
+    const studentStats = [];
 
-      for (const student of subject.class.students) {
-        const attendanceRecords = await prisma.attendance.findMany({
-          where: {
-            subjectId: subject.id,
-            studentId: student.id,
-          },
-        });
-
-        const presentCount = attendanceRecords.filter(
-          (a) => a.status === "PRESENT"
-        ).length;
-
-        const totalCount = attendanceRecords.length;
-        const percentage =
-          totalCount > 0 ? (presentCount / totalCount) * 100 : 0;
-
-        studentStats.push({
+    // Loop through each student in the class
+    for (const student of subject.class.students) {
+      const attendanceRecords = await prisma.attendance.findMany({
+        where: {
+          subjectId,
           studentId: student.id,
-          studentName: student.user.name,
-          present: presentCount,
-          total: totalCount,
-          percentage: Math.round(percentage),
-        });
-      }
+        },
+      });
 
-      result.push({
-        subjectId: subject.id,
-        subjectName: subject.name,
-        students: studentStats,
+      const presentCount = attendanceRecords.filter(
+        (a) => a.status === "PRESENT"
+      ).length;
+
+      const totalCount = attendanceRecords.length;
+      const percentage = totalCount > 0 ? (presentCount / totalCount) * 100 : 0;
+
+      studentStats.push({
+        studentId: student.id,
+        studentName: student.user.name,
+        present: presentCount,
+        total: totalCount,
+        percentage: Math.round(percentage),
       });
     }
 
-    return result;
+    return {
+      subjectId: subject.id,
+      subjectName: subject.name,
+      students: studentStats,
+    };
   }
 
   async getAttendancePercentageByUser(studentId) {

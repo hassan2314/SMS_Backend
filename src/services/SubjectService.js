@@ -85,16 +85,21 @@ export class SubjectService {
   }
 
   async getSubjectById(id) {
-    return await prisma.subject.findUnique({
+    if (!id) return null;
+
+    const subject = await prisma.subject.findUnique({
       where: { id },
       include: {
-        class: true,
+        class: { select: { id: true, name: true } },
         teacher: {
-          include: {
-            user: { select: { email: true, name: true } },
+          select: {
+            id: true,
+            user: { select: { name: true } },
           },
         },
       },
     });
+
+    return subject;
   }
 }

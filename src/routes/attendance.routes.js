@@ -19,6 +19,13 @@ router.get(
   controller.getClassAttendance
 );
 
+router.get(
+  "/subject/:subjectId",
+  verifyJwt,
+  adminOrTecherOnly,
+  controller.getAttendancePercentageBySubject
+);
+
 router.get("/:id", verifyJwt, controller.getAttendancePercentageByStudent);
 
 router.get(
