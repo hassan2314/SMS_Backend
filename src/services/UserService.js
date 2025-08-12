@@ -1,4 +1,4 @@
-import prisma from "../db/index.js"; 
+import prisma from "../db/index.js";
 
 export class UserService {
   async create(data) {
@@ -22,7 +22,17 @@ export class UserService {
   }
 
   async findById(id) {
-    return await prisma.user.findUnique({ where: { id } });
+    return await prisma.user.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
   }
 
   async findByEmail(email) {
@@ -43,5 +53,4 @@ export class UserService {
       data: { password },
     });
   }
-
 }

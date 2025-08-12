@@ -58,9 +58,19 @@ export class UserController {
 
       const accessToken = this.generateAccessToken(user);
 
-      return res
-        .status(200)
-        .json(new ApiResponse(200, { accessToken }, "Access token refreshed"));
+      // Remove sensitive data (e.g. password, refreshToken) before sending user
+      const { password, refreshToken, ...safeUser } = user;
+
+      return res.status(200).json(
+        new ApiResponse(
+          200,
+          {
+            accessToken,
+            user: safeUser, // ✅ include user in response
+          },
+          "Access token refreshed"
+        )
+      );
     } catch (error) {
       return res
         .status(401)
@@ -130,16 +140,9 @@ export class UserController {
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     });
 
-    res.cookie("accessToken", accessToken, {
-      httpOnly: true,
-      // secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
-      maxAge: 1 * 24 * 60 * 60 * 1000, // 7 days
-    });
-
     return res
       .status(200)
-      .json(new ApiResponse(200, { accessToken }, "Login successful"));
+      .json(new ApiResponse(200, { accessToken, user }, "Login successful"));
   };
 
   logoutUser = async (req, res) => {
@@ -147,7 +150,7 @@ export class UserController {
       console.log("user id ", req.user.id);
       await this.userService.updateUser(req.user.id, { refreshToken: null });
       res.clearCookie("refreshToken");
-      res.clearCookie("accessToken");
+
       return res
         .status(200)
         .json(new ApiResponse(200, null, "Logout successful"));
@@ -179,7 +182,7 @@ export class UserController {
     }
   };
 
-  async deleteUser(req, res) {
+  deleteUser = async (req, res) => {
     try {
       const { id } = req.user;
       const deletedUser = await this.userService.deleteUser(id);
@@ -193,9 +196,9 @@ export class UserController {
     } catch (error) {
       return res.status(500).json(new ApiError(500, error.message));
     }
-  }
+  };
 
-  async deleteByAdmin(req, res) {
+  deleteByAdmin = async (req, res) => {
     try {
       if (req.user.role !== "ADMIN") {
         return res
@@ -215,9 +218,9 @@ export class UserController {
     } catch (error) {
       return res.status(500).json(new ApiError(500, error.message));
     }
-  }
+  };
 
-  async updateUser(req, res) {
+  updateUser = async (req, res) => {
     try {
       const { id } = req.user;
       const { name, dob } = req.body;
@@ -231,9 +234,9 @@ export class UserController {
     } catch (error) {
       return res.status(500).json(new ApiError(500, error.message));
     }
-  }
+  };
 
-  async getUsers(req, res) {
+  getUsers = async (req, res) => {
     try {
       if (req.user.role !== "ADMIN") {
         return res
@@ -249,20 +252,22 @@ export class UserController {
     } catch (error) {
       return res.status(500).json(new ApiError(500, error.message));
     }
-  }
+  };
 
-  async getUser(req, res) {
+  getUserById = async (req, res) => {
     try {
-      const { id } = req.user;
+      const { id } = req.params;
       const user = await this.userService.findById(id);
+      console.log(id);
       if (!user) {
         return res.status(404).json(new ApiError(404, "User not found"));
       }
+
       return res
         .status(200)
         .json(new ApiResponse(200, user, "User fetched successfully"));
     } catch (error) {
       return res.status(500).json(new ApiError(500, error.message));
     }
-  }
+  };
 }

@@ -106,4 +106,21 @@ export class AdminController {
       next(err);
     }
   };
+
+  findDetailById = async (req, res) => {
+    try {
+      const { id } = req.params;
+
+      const userDetails = await this.adminService.findDetailById(id);
+
+      if (!userDetails) {
+        throw new ApiError(404, "User details not found");
+      }
+
+      res.status(200).json(new ApiResponse(200, userDetails, "Fetched"));
+    } catch (error) {
+      console.error("Error in findDetailById:", error);
+      throw new ApiError(500, error.message);
+    }
+  };
 }

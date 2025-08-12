@@ -19,5 +19,6 @@ router.get("/overview-stats", adminController.getOverviewStats);
 router.get("/assignment-stats", adminController.getAssignmentStats);
 router.get("/attendance-summary", adminController.getAttendanceSummary);
 router.get("/stats/monthly-results", adminController.getMonthlyResultStats);
+router.get("/users/:id", adminController.findDetailById);
 
 export default router;

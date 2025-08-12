@@ -9,6 +9,7 @@ export class StudentService {
           select: {
             name: true,
             email: true,
+            createdAt: true,
           },
         },
         class: {
@@ -33,6 +34,8 @@ export class StudentService {
         user: {
           select: {
             name: true,
+            email: true,
+            createdAt: true,
           },
         },
       },
