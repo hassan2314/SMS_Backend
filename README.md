@@ -19,7 +19,7 @@ There is no fees or billing model in the schema, so the API does not expose one.
 
 ## Stack
 
-- Node.js 20+ (ES modules), Express 5
+- Node.js 22 (ES modules), Express 5
 - Prisma 6 and PostgreSQL
 - JWT (`jsonwebtoken`) and `bcryptjs`
 - `cors` and `cookie-parser`
@@ -28,9 +28,11 @@ There is no fees or billing model in the schema, so the API does not expose one.
 
 HTTP JSON hits Express routes in `src/app.js`, controllers validate and shape the response, services talk to a single Prisma client, and Prisma talks to PostgreSQL.
 
-Access tokens travel in `Authorization: Bearer <token>`. Refresh tokens travel in an httpOnly cookie named `refreshToken`. Successful JSON bodies use `{ success, statusCode, message, data }`.
+Locally and on Render, `src/index.js` calls `listen`. On Vercel it does not: `api/index.js` exports the same app, and `vercel.json` rewrites `/`, `/health`, and `/api/v1/*` to that function.
 
-The Prisma schema and migrations are at `src/db/prisma/prisma/`. `package.json` points the Prisma CLI at that schema, so the usual `prisma` commands work from the repo root.
+Access tokens travel in `Authorization: Bearer <token>`. Refresh tokens travel in an httpOnly cookie named `refreshToken`. In production that cookie is `Secure` and `SameSite=None`, so a frontend on another host can send it. Successful JSON bodies use `{ success, statusCode, message, data }`.
+
+The Prisma schema and migrations are at `src/db/prisma/prisma/`. The app uses `DATABASE_URL`. Migrations use `directUrl` (`DATABASE_URL_UNPOOLED`). Local commands copy `DATABASE_URL` into `DATABASE_URL_UNPOOLED` when you only set one of them.
 
 ## API overview
 
@@ -149,7 +151,7 @@ Public registration cannot create an `ADMIN`. Promote someone later with `PUT /a
 
 ## Local setup
 
-Requirements: Node.js 20 or newer, and a Postgres database (local Postgres, [Neon](https://neon.tech) free, or [Supabase](https://supabase.com) free).
+Requirements: Node.js 22, and a Postgres database (local Postgres or the free Neon database from the deploy steps). You only need `DATABASE_URL`. Leave `DATABASE_URL_UNPOOLED` unset unless you already have a separate direct URL.
 
 ```bash
 git clone https://github.com/hassan2314/SMS_Backend.git
@@ -173,89 +175,91 @@ Names only. Copy `.env.example` and replace the placeholders. Do not commit `.en
 
 | Name | Required | Purpose |
 | --- | --- | --- |
-| `DATABASE_URL` | Yes | Postgres connection string. Use the direct (non-pooler) URL so migrations work. Include `sslmode=require` on Neon and Supabase. |
+| `DATABASE_URL` | Yes | Postgres URL used by the running API. On Vercel this is the pooled Neon URL injected by the marketplace integration. Locally it is your own Postgres URL. Include `sslmode=require` for Neon. |
+| `DATABASE_URL_UNPOOLED` | On Vercel | Direct Neon URL. Prisma uses it as `directUrl` so `migrate deploy` does not go through the pooler. The Vercel Neon integration injects it. Locally you can omit it; scripts copy `DATABASE_URL` into it. |
 | `ACCESS_TOKEN_SECRET` | Yes | Signs access tokens. Long random string. |
 | `REFRESH_TOKEN_SECRET` | Yes | Signs refresh tokens. A different long random string. |
 | `CLIENT_URL` | Yes in production | Allowed browser origins, comma-separated, no trailing slash. Example: `https://your-app.vercel.app,http://localhost:5173`. Defaults to `http://localhost:5173`. |
-| `PORT` | No | Listen port. Defaults to `4000`. Render sets this. |
-| `NODE_ENV` | No | `production` on Render. Enables Secure, `SameSite=None` refresh cookies for a separate frontend host. |
-| `RUN_MIGRATIONS` | No | `true` runs `prisma migrate deploy` in the background after the server starts listening. `false` skips it. Production defaults to running it. |
-| `MIGRATE_TIMEOUT_MS` | No | How long that background migrate may run. Default `60000`. |
+| `PORT` | No | Listen port for `npm run dev` / `npm start`. Defaults to `4000`. Vercel does not use it. |
+| `NODE_ENV` | No | Vercel sets `production`. That enables `Secure` and `SameSite=None` on the refresh cookie so a frontend on another host can send it. |
+| `RUN_MIGRATIONS` | No | Long-running hosts only (`npm start`). `true` runs `prisma migrate deploy` in the background after listen. Ignored on Vercel, where migrate runs in the build. |
+| `MIGRATE_TIMEOUT_MS` | No | How long that background migrate may run. Default `60000`. Ignored on Vercel. |
 
 A shell `DATABASE_URL` wins over `.env`, which is how you seed a hosted database without editing the local file.
 
-The server adds `connect_timeout=15`, `pool_timeout=15`, and `connection_limit=5` when those are missing, so a sleeping database returns an error instead of hanging the process.
+The server adds `connect_timeout=15` and `pool_timeout=15` when those are missing, so a sleeping database returns an error instead of hanging the process. It also sets `connection_limit=1` on Vercel and `connection_limit=5` elsewhere, and adds `pgbouncer=true` on Vercel when the host name contains `pooler`.
 
-## Deploy on the free tier
+## Deploy on Vercel Hobby + Neon
 
-Use a **free Render web service** plus **free Neon or Supabase Postgres**. This repo does not provision a paid instance, disk, or database. Render's own free Postgres expires 30 days after creation, so keep the data on Neon or Supabase.
+Host the API on a **Vercel Hobby (free)** project. The database is **Neon Postgres on the free plan**, connected from the Vercel Marketplace. That integration injects `DATABASE_URL` (pooled) and `DATABASE_URL_UNPOOLED` (direct). Do not turn on a paid Vercel plan, a paid Neon compute size, or any other paid add-on.
 
-`render.yaml` is a Render blueprint for the free web service. It does not create a database. `ACCESS_TOKEN_SECRET` and `REFRESH_TOKEN_SECRET` are generated by Render and are not stored in git.
+`vercel.json` builds with `npm run build` and rewrites every path to the Node function `api/index.js`. That file exports the Express app and does not call `listen`. The Prisma client is generated with `binaryTargets` `native` and `rhel-openssl-3.0.x` so the query engine matches Vercel's Node runtime.
 
-### 1. Create the database
-
-**Neon (free)**
-
-1. Create a project on the Neon free plan.
-2. Open Connect and copy the **direct** connection string. The hostname must not contain `-pooler`.
-3. It looks like `postgresql://USER:PASSWORD@ep-example.region.aws.neon.tech/neondb?sslmode=require`.
-
-**Supabase (free)** is the same idea: Project Settings → Database → URI for the **direct** host `db.<project-ref>.supabase.co` on port **5432**. Do not use the transaction pooler on port 6543. Add `?sslmode=require` if it is missing.
-
-Use that one string as `DATABASE_URL` for both the app and `prisma migrate deploy`. This process is a single Node server, so it does not need PgBouncer, and migrations through a transaction pooler fail.
-
-### 2. Create the Render web service
+### 1. Import the project
 
 1. Push this repo to GitHub.
-2. In the Render dashboard, choose **New → Blueprint** and select the repo (this applies `render.yaml`), or choose **New → Web Service** and set the values below yourself.
-3. Instance type: **Free**.
-4. Build command: `npm install && npm run build`  
-   `npm run build` is `prisma generate && prisma migrate deploy`.
-5. Start command: `npm start`
-6. Health check path: `/health`
-7. Environment variables:
+2. In the Vercel dashboard, on the Hobby team, choose **Add New → Project** and import the repository.
+3. Framework preset: **Other** (choose Express if Vercel offers that preset for this repo).
+4. Node.js version: **22**.
+5. Install command: `npm install` (the `postinstall` script runs `prisma generate`).
+6. Build command: `npm run build`.
+7. Do not set a custom start command. Vercel invokes `api/index.js`.
+
+`npm run build` always runs `prisma generate`. It runs `prisma migrate deploy` only when `DATABASE_URL` is set, and it copies `DATABASE_URL` into `DATABASE_URL_UNPOOLED` when the direct URL is missing.
+
+### 2. Connect free Neon
+
+1. In the project, open **Storage** or **Marketplace** and add **Neon Postgres** (Vercel-managed Neon, free plan).
+2. Connect the database to this project.
+3. Confirm the integration created both variables and that they are available during the build:
+   - `DATABASE_URL` — pooled host, the name contains `-pooler`
+   - `DATABASE_URL_UNPOOLED` — direct host, no `-pooler`
+
+Prisma migrations read `DATABASE_URL_UNPOOLED` via `directUrl`. The running function reads `DATABASE_URL`.
+
+### 3. Set the app secrets
+
+Add these for Production. Add the same names for Preview if preview deployments should log in.
 
 | Name | Value |
 | --- | --- |
-| `NODE_ENV` | `production` |
-| `NODE_VERSION` | `22` |
-| `RUN_MIGRATIONS` | `true` |
-| `DATABASE_URL` | The direct Postgres URL from step 1. Leave it available during builds so migrate can run. |
-| `CLIENT_URL` | The frontend origin, no trailing slash. Add `http://localhost:5173` after a comma if you still call the hosted API from local Vite. |
-| `ACCESS_TOKEN_SECRET` | `openssl rand -base64 32` (the blueprint generates one for you) |
+| `ACCESS_TOKEN_SECRET` | `openssl rand -base64 32` |
 | `REFRESH_TOKEN_SECRET` | A second random string |
+| `CLIENT_URL` | Frontend origin, no trailing slash. Example: `https://your-frontend.vercel.app`. Add `,http://localhost:5173` if local Vite calls this API. |
 
-8. Deploy. The process binds `0.0.0.0` and `PORT` immediately. `/health` does not query Postgres, so a cold database cannot fail Render's health check (a missing `2xx` within 5 seconds marks the instance unhealthy). Queries give up after the connect timeout above. The background migrate is killed after `MIGRATE_TIMEOUT_MS` if the database never answers, and the port stays open.
+Vercel sets `NODE_ENV=production`. Login then sets the refresh cookie to `HttpOnly; Secure; SameSite=None`. `CLIENT_URL` must be the exact browser origin or the credentialed CORS check rejects the request.
 
-### 3. Seed Willowmere
+### 4. Deploy and seed
 
-Free Render web services have no shell. From your machine, with this repo installed:
+Deploy the project. The first build applies the SQL migrations to Neon.
+
+Hobby functions have no shell. From this repo on your machine, seed with the **direct** URL:
 
 ```bash
-DATABASE_URL="postgresql://USER:PASSWORD@HOST:5432/DATABASE?sslmode=require" npm run db:seed
+DATABASE_URL="postgresql://USER:PASSWORD@ep-example.region.aws.neon.tech/neondb?sslmode=require" npm run db:seed
 ```
 
 Run it again any time you want the demo school put back.
 
-### 4. Point the frontend at the API
-
-In the frontend project set:
+### 5. Point the frontend at the API
 
 ```bash
-VITE_API_BASE_URL=https://<your-service>.onrender.com/api/v1/
+VITE_API_BASE_URL=https://<project>.vercel.app/api/v1/
 ```
 
-The trailing slash matches that client's axios base URL. `CLIENT_URL` on this API must be the site the browser is actually on (scheme and host only).
+The trailing slash matches that client's axios base URL.
 
-Free Render web services sleep after about 15 minutes without traffic. The next request wakes them, which can take around a minute. Neon free compute also sleeps when idle. `/health` still returns as soon as the Node process is up. The first real API call after a long sleep may need one retry while Postgres wakes.
+A Hobby function scales to zero when idle, and Neon free compute sleeps when idle. `/health` does not query Postgres, so it only waits for the function to start. The first real API call after a long sleep may need one retry while Neon wakes.
+
+`render.yaml` is still a valid blueprint for a free Render web service. It is not used by the Vercel project.
 
 ## Scripts
 
 | Script | What it does |
 | --- | --- |
 | `npm run dev` | Nodemon, local API on port 4000. Does not migrate unless `RUN_MIGRATIONS=true`. |
-| `npm start` | Production process. Listens first, then migrates in the background when `NODE_ENV=production` or `RUN_MIGRATIONS=true`. |
-| `npm run build` | `prisma generate` and `prisma migrate deploy`. |
+| `npm start` | Long-running process. Listens first, then migrates in the background when `NODE_ENV=production` or `RUN_MIGRATIONS=true`. On Vercel this file does not listen and does not migrate. |
+| `npm run build` | `prisma generate`. Also `prisma migrate deploy` when `DATABASE_URL` is set. |
 | `npm run db:migrate` | Apply migrations only. |
 | `npm run db:seed` | Idempotent Willowmere demo data. |
 | `npm run db:setup` | Migrate, then seed. |

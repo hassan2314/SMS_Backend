@@ -5,16 +5,16 @@
   "main": "src/index.js",
   "type": "module",
   "engines": {
-    "node": ">=20"
+    "node": "22.x"
   },
   "scripts": {
     "dev": "nodemon src/index.js",
     "start": "node src/index.js",
-    "build": "prisma generate && prisma migrate deploy",
-    "postinstall": "prisma generate",
-    "db:migrate": "prisma migrate deploy",
-    "db:seed": "prisma db seed",
-    "db:setup": "prisma migrate deploy && prisma db seed"
+    "build": "node scripts/prisma-cli.js build",
+    "postinstall": "node scripts/prisma-cli.js generate",
+    "db:migrate": "node scripts/prisma-cli.js migrate",
+    "db:seed": "node scripts/prisma-cli.js seed",
+    "db:setup": "node scripts/prisma-cli.js setup"
   },
   "prisma": {
     "schema": "src/db/prisma/prisma/schema.prisma",
