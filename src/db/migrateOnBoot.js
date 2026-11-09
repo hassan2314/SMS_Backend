@@ -16,6 +16,8 @@ let migrateChild = null;
  * this pass covers a start that skipped the build.
  */
 export function migrateOnBoot() {
+  if (process.env.VERCEL === "1") return;
+
   const enabled =
     process.env.RUN_MIGRATIONS === "true" ||
     (process.env.NODE_ENV === "production" &&

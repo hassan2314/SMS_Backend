@@ -1,5 +1,7 @@
-# Free Render web service for this API.
-# Postgres is external (Neon or Supabase free). This file does not create a database.
+# Optional free Render web service. The documented host is Vercel Hobby
+# (vercel.json). This file does not create a database.
+# npm run build applies migrations when DATABASE_URL is set, and copies it
+# into DATABASE_URL_UNPOOLED when that variable is absent.
 
 services:
   - type: web
