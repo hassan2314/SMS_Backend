@@ -16,6 +16,7 @@ export class AdminService {
   async deleteUserById(userId) {
     return prisma.user.delete({
       where: { id: userId },
+      select: { id: true, name: true, email: true, role: true },
     });
   }
 
@@ -23,6 +24,7 @@ export class AdminService {
     return prisma.user.update({
       where: { id: userId },
       data: { role: newRole },
+      select: { id: true, name: true, email: true, role: true },
     });
   }
 

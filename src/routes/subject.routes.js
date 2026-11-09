@@ -14,7 +14,6 @@ router.put("/:id", verifyJwt, adminOnly, subjectController.updateSubject);
 router.delete("/:id", verifyJwt, adminOnly, subjectController.deleteSubject);
 
 router.get("/", verifyJwt, subjectController.getAllSubjects);
-router.get("/:id", verifyJwt, subjectController.getSubjectById);
 router.get(
   "/class/:classId",
   verifyJwt,
@@ -25,5 +24,6 @@ router.get(
   verifyJwt,
   subjectController.getSubjectsByTeacherId
 );
+router.get("/:id", verifyJwt, subjectController.getSubjectById);
 
 export default router;

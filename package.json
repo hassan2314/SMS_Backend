@@ -1,15 +1,28 @@
 {
-  "name": "backend",
+  "name": "sms-backend",
   "version": "1.0.0",
-  "main": "index.js",
+  "description": "REST API for a school management system: accounts, classes, attendance, assignments, and results.",
+  "main": "src/index.js",
   "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
-    "dev": "nodemon src/index.js"
+    "dev": "nodemon src/index.js",
+    "start": "node src/index.js",
+    "build": "prisma generate && prisma migrate deploy",
+    "postinstall": "prisma generate",
+    "db:migrate": "prisma migrate deploy",
+    "db:seed": "prisma db seed",
+    "db:setup": "prisma migrate deploy && prisma db seed"
+  },
+  "prisma": {
+    "schema": "src/db/prisma/prisma/schema.prisma",
+    "seed": "node src/db/prisma/prisma/seed.js"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "description": "",
   "dependencies": {
     "@prisma/client": "^6.11.0",
     "bcryptjs": "^3.0.2",
@@ -17,10 +30,10 @@
     "cors": "^2.8.5",
     "dotenv": "^17.0.1",
     "express": "^5.1.0",
-    "jsonwebtoken": "^9.0.2"
+    "jsonwebtoken": "^9.0.2",
+    "prisma": "^6.11.0"
   },
   "devDependencies": {
-    "nodemon": "^3.1.10",
-    "prisma": "^6.11.0"
+    "nodemon": "^3.1.10"
   }
 }

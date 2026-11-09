@@ -26,13 +26,13 @@ router.get(
   controller.getAttendancePercentageBySubject
 );
 
-router.get("/:id", verifyJwt, controller.getAttendancePercentageByStudent);
-
 router.get(
   "/all",
   verifyJwt,
   adminOrTecherOnly,
   controller.getAttendancePercentageBySubject
 );
+
+router.get("/:id", verifyJwt, controller.getAttendancePercentageByStudent);
 
 export default router;

@@ -1,0 +1,26 @@
+# Free Render web service for this API.
+# Postgres is external (Neon or Supabase free). This file does not create a database.
+
+services:
+  - type: web
+    name: sms-backend
+    runtime: node
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: "22"
+      - key: RUN_MIGRATIONS
+        value: "true"
+      - key: DATABASE_URL
+        sync: false
+      - key: CLIENT_URL
+        sync: false
+      - key: ACCESS_TOKEN_SECRET
+        generateValue: true
+      - key: REFRESH_TOKEN_SECRET
+        generateValue: true
