@@ -39,6 +39,10 @@ export class UserService {
     return await prisma.user.findUnique({ where: { email } });
   }
 
+  async findAuthById(id) {
+    return await prisma.user.findUnique({ where: { id } });
+  }
+
   async updateUser(id, data) {
     return await prisma.user.update({ where: { id }, data });
   }

@@ -4,12 +4,47 @@ import cors from "cors";
 import { errorHandler } from "../src/middleware/errorHandler.middleware.js";
 
 const app = express();
+
+app.set("trust proxy", 1);
+
+const defaultClientOrigin = "http://localhost:5173";
+
+function allowedClientOrigins() {
+  return (process.env.CLIENT_URL || defaultClientOrigin)
+    .split(",")
+    .map((value) => value.trim().replace(/\/$/, ""))
+    .filter(Boolean);
+}
+
 app.use(
   cors({
-    origin: process.env.CLIENT_URL || "http://localhost:5173",
+    origin(origin, callback) {
+      if (!origin) {
+        callback(null, true);
+        return;
+      }
+      const allowed = allowedClientOrigins().includes(origin.replace(/\/$/, ""));
+      callback(null, allowed);
+    },
     credentials: true,
   })
 );
+
+app.get("/health", (_req, res) => {
+  res.status(200).json({
+    status: "ok",
+    service: "sms-backend",
+    uptime: Math.round(process.uptime()),
+  });
+});
+
+app.get("/", (_req, res) => {
+  res.status(200).json({
+    service: "School Management System API",
+    health: "/health",
+    api: "/api/v1",
+  });
+});
 
 app.use(express.json({ limit: "32kb" }));
 app.use(express.urlencoded({ extended: true, limit: "32kb" }));

@@ -3,6 +3,28 @@ import { ApiError } from "../utils/ApiError.js";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 
+const REFRESH_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+
+function refreshCookieBase() {
+  const crossSite = process.env.NODE_ENV === "production";
+  return {
+    httpOnly: true,
+    secure: crossSite,
+    sameSite: crossSite ? "none" : "lax",
+    path: "/",
+  };
+}
+
+function refreshCookieOptions() {
+  return { ...refreshCookieBase(), maxAge: REFRESH_MAX_AGE_MS };
+}
+
+function publicUser(user) {
+  if (!user) return user;
+  const { password, refreshToken, ...safe } = user;
+  return safe;
+}
+
 export class UserController {
   constructor(userService) {
     this.userService = userService;
@@ -29,12 +51,7 @@ export class UserController {
         refreshToken: newRefreshToken,
       });
 
-      res.cookie("refreshToken", newRefreshToken, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "strict",
-        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-      });
+      res.cookie("refreshToken", newRefreshToken, refreshCookieOptions());
 
       return newRefreshToken;
     } catch (err) {
@@ -51,7 +68,7 @@ export class UserController {
 
       const decoded = jwt.verify(token, process.env.REFRESH_TOKEN_SECRET);
 
-      const user = await this.userService.findById(decoded.id);
+      const user = await this.userService.findAuthById(decoded.id);
       if (!user || user.refreshToken !== token) {
         throw new ApiError(403, "Invalid refresh token");
       }
@@ -83,24 +100,35 @@ export class UserController {
   createUser = async (req, res) => {
     try {
       const data = req.body;
-      const dob = new Date(data.dob);
-      data.dob = dob;
-      const hashedPassword = await bcrypt.hash(data.password, 10);
-      data.password = hashedPassword;
+      if (!["TEACHER", "STUDENT"].includes(data.role)) {
+        return res
+          .status(400)
+          .json(new ApiError(400, "Role must be TEACHER or STUDENT"));
+      }
 
       const existUser = await this.userService.findByEmail(data.email);
       if (existUser) {
         return res.status(400).json(new ApiError(400, "User already exists"));
       }
 
+      data.dob = new Date(data.dob);
+      data.password = await bcrypt.hash(data.password, 10);
+
       const user = await this.userService.create(data);
       if (!user) {
         return res.status(400).json(new ApiError(400, "User not created"));
       }
 
-      return res
-        .status(201)
-        .json(new ApiResponse(201, user, "User created successfully"));
+      const accessToken = this.generateAccessToken(user);
+      await this.updateRefreshToken(user, res);
+
+      return res.status(201).json(
+        new ApiResponse(
+          201,
+          { accessToken, user: publicUser(user) },
+          "User created successfully"
+        )
+      );
     } catch (error) {
       return res.status(500).json(new ApiError(500, error.message));
     }
@@ -133,23 +161,20 @@ export class UserController {
       throw new ApiError(500, "Failed to generate refresh token");
     }
 
-    res.cookie("refreshToken", refreshToken, {
-      httpOnly: true,
-      // secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-    });
-
-    return res
-      .status(200)
-      .json(new ApiResponse(200, { accessToken, user }, "Login successful"));
+    return res.status(200).json(
+      new ApiResponse(
+        200,
+        { accessToken, user: publicUser(user) },
+        "Login successful"
+      )
+    );
   };
 
   logoutUser = async (req, res) => {
     try {
       console.log("user id ", req.user.id);
       await this.userService.updateUser(req.user.id, { refreshToken: null });
-      res.clearCookie("refreshToken");
+      res.clearCookie("refreshToken", refreshCookieBase());
 
       return res
         .status(200)
@@ -164,7 +189,7 @@ export class UserController {
       const { id } = req.user;
       const { previousPassword, password } = req.body;
 
-      const user = await this.userService.findById(id);
+      const user = await this.userService.findAuthById(id);
       const isPasswordValid = await bcrypt.compare(
         previousPassword,
         user.password
@@ -189,10 +214,10 @@ export class UserController {
       if (!deletedUser) {
         return res.status(404).json(new ApiError(404, "User not found"));
       }
-      res.clearCookie("refreshToken");
+      res.clearCookie("refreshToken", refreshCookieBase());
       return res
         .status(200)
-        .json(new ApiResponse(200, deletedUser, "User deleted successfully"));
+        .json(new ApiResponse(200, publicUser(deletedUser), "User deleted successfully"));
     } catch (error) {
       return res.status(500).json(new ApiError(500, error.message));
     }
@@ -214,7 +239,9 @@ export class UserController {
       }
       return res
         .status(200)
-        .json(new ApiResponse(200, deletedUser, "User deleted successfully"));
+        .json(
+          new ApiResponse(200, publicUser(deletedUser), "User deleted successfully")
+        );
     } catch (error) {
       return res.status(500).json(new ApiError(500, error.message));
     }
@@ -230,7 +257,9 @@ export class UserController {
       }
       return res
         .status(200)
-        .json(new ApiResponse(200, updatedUser, "User updated successfully"));
+        .json(
+          new ApiResponse(200, publicUser(updatedUser), "User updated successfully")
+        );
     } catch (error) {
       return res.status(500).json(new ApiError(500, error.message));
     }
